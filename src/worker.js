@@ -14,6 +14,9 @@ import { SHORTENERS } from '../public/lists.js';
 import { preview } from './preview.js';
 import { isAuthorized, login, logout } from './auth.js';
 
+// Volitelné klíče: prázdná hodnota nebo zástupný znak (např. „-“ z formuláře Deploy to Cloudflare) = klíč není nastaven.
+const apiKey = (v) => (typeof v === 'string' && v.trim().length >= 16 ? v.trim() : '');
+
 const VT = 'https://www.virustotal.com/api/v3';
 const SB = 'https://safebrowsing.googleapis.com/v5/hashes:search';
 const DOMAIN_RE = /^(?=.{1,253}$)(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$/;
@@ -73,7 +76,7 @@ async function handleApi(request, env, path) {
   if (!(await isAuthorized(request, env))) return json({ error: 'unauthorized' }, 401);
 
   switch (path) {
-    case '/api/config': return json({ vt: !!env.VT_API_KEY, sb: !!env.SB_API_KEY, rdap: true, unroll: true, preview: !!env.BROWSER });
+    case '/api/config': return json({ vt: !!apiKey(env.VT_API_KEY), sb: !!apiKey(env.SB_API_KEY), rdap: true, unroll: true, preview: !!env.BROWSER });
     case '/api/vt/url': return vtUrl(env, body);
     case '/api/vt/domain': return vtDomain(env, body);
     case '/api/vt/submit-domain': return vtSubmitDomain(env, body);
@@ -89,8 +92,8 @@ async function handleApi(request, env, path) {
 // ---------------- VirusTotal ----------------
 
 async function vtFetch(env, path, init = {}) {
-  if (!env.VT_API_KEY) return { status: 503, data: { error: 'not_configured' } };
-  const r = await fetch(VT + path, { ...init, headers: { 'x-apikey': env.VT_API_KEY, ...(init.headers || {}) } });
+  if (!apiKey(env.VT_API_KEY)) return { status: 503, data: { error: 'not_configured' } };
+  const r = await fetch(VT + path, { ...init, headers: { 'x-apikey': apiKey(env.VT_API_KEY), ...(init.headers || {}) } });
   let data = null;
   try { data = await r.json(); } catch { /* ignore */ }
   return { status: r.status, data };
@@ -169,12 +172,12 @@ async function vtAnalysis(env, { id }) {
 
 // Vstup: { prefixes: [base64 4 bajty] } — Google uvidí jen prefixy hashů.
 async function safeBrowsing(env, { prefixes }) {
-  if (!env.SB_API_KEY) return json({ error: 'not_configured' }, 503);
+  if (!apiKey(env.SB_API_KEY)) return json({ error: 'not_configured' }, 503);
   if (!Array.isArray(prefixes) || !prefixes.length || prefixes.length > 30 ||
       !prefixes.every((p) => /^[A-Za-z0-9+/]{6}==$/.test(p))) {
     return json({ error: 'bad_request' }, 400);
   }
-  const q = new URLSearchParams({ key: env.SB_API_KEY });
+  const q = new URLSearchParams({ key: apiKey(env.SB_API_KEY) });
   for (const p of prefixes) q.append('hashPrefixes', p);
   const r = await fetch(`${SB}?${q}`);
   if (r.status === 429) return json({ error: 'rate_limited' }, 429);

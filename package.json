@@ -24,10 +24,10 @@
         "description": "Heslo do appky (aspoň 12 znaků). Chrání tvůj server, aby tvoje API kvóty nemohl používat kdokoliv. Ulož si ho, budeš ho zadávat v telefonu."
       },
       "VT_API_KEY": {
-        "description": "Volitelné. Klíč k VirusTotalu: zaregistruj se na [virustotal.com](https://www.virustotal.com/gui/join-us), pak profil → API key. Zdarma 500 dotazů denně."
+        "description": "Volitelné – pokud klíč nemáš, napiš „-“. Klíč k VirusTotalu: zaregistruj se na [virustotal.com](https://www.virustotal.com/gui/join-us), pak profil → API key. Zdarma 500 dotazů denně."
       },
       "SB_API_KEY": {
-        "description": "Volitelné. Klíč ke Google Safe Browsing: v [Google Cloud Console](https://console.cloud.google.com/apis/library/safebrowsing.googleapis.com) povol Safe Browsing API, pak Credentials → Create credentials → API key."
+        "description": "Volitelné – pokud klíč nemáš, napiš „-“. Klíč ke Google Safe Browsing: v [Google Cloud Console](https://console.cloud.google.com/apis/library/safebrowsing.googleapis.com) povol Safe Browsing API, pak Credentials → Create credentials → API key."
       }
     }
   }

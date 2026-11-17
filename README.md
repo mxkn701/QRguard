@@ -55,7 +55,8 @@ API klíče jsou volitelné a dají se doplnit později. Bez nich fungují offli
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/mxkn701/QRguard)
 
 Cloudflare si vyžádá přihlášení, zkopíruje repozitář do tvého GitHubu a zeptá se na **heslo** a **klíče**
-(u každého pole je návod, kde ho získat). Pak appku sám nasadí a ukáže adresu.
+(u každého pole je návod, kde ho získat). Formulář vyžaduje vyplnit všechna pole: když klíč nemáš, napiš `-`.
+Pak appku sám nasadí a ukáže adresu.
 
 ### Možnost B: průvodce v terminálu
 
