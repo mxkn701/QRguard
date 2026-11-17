@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "qrguard",
+  "main": "src/worker.js",
+  "compatibility_date": "2025-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // Izolovaný Chrome pro „Bezpečný náhled“ (free: 10 min/den)
+  "browser": { "binding": "BROWSER" },
+  // Omezení pokusů o přihlášení: 5 za minutu z jedné IP (přibližné, po lokalitách)
+  "ratelimits": [
+    { "name": "LOGIN_LIMITER", "namespace_id": "4817", "simple": { "limit": 5, "period": 60 } }
+  ],
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    // Worker běží první, aby ke všem souborům přidal bezpečnostní hlavičky (CSP apod.)
+    "run_worker_first": true
+  },
+  // Žádné logy požadavků — nechceme nikde ukládat, co se skenovalo.
+  "observability": { "enabled": false }
+}

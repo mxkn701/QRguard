@@ -1,0 +1,5 @@
+# Tajné hodnoty QRguardu. Pro lokální vývoj zkopíruj jako .dev.vars a vyplň (necommituj!).
+# Na serveru je nastaví průvodce (npm run setup) nebo tlačítko Deploy to Cloudflare.
+APP_PASSWORD=
+VT_API_KEY=
+SB_API_KEY=

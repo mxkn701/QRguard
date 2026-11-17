@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1720">
+  <meta name="referrer" content="no-referrer">
+  <title>QRguard</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+  <script src="vendor/jsQR.js" defer></script>
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><img src="icon.svg" alt="" width="28" height="28"><span>QRguard</span></div>
+    <button id="btn-settings" class="icon-btn" aria-label="Nastavení" title="Nastavení">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.3 7.3 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.3 7.3 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1c.5.4 1.1.7 1.7 1l.4 2.6h4l.4-2.6c.6-.3 1.2-.6 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg>
+    </button>
+  </header>
+
+  <main>
+    <div id="status" class="status" hidden></div>
+
+    <section id="login" class="card login" hidden>
+      <h2>Přihlášení</h2>
+      <p class="muted small">Heslo stačí zadat jednou — zařízení si tě pak 90 dní pamatuje. Offline kontrola funguje i bez přihlášení.</p>
+      <form id="login-form" class="login-form">
+        <input type="text" name="username" value="qrguard" autocomplete="username" hidden>
+        <input id="login-password" name="password" type="password" autocomplete="current-password" placeholder="Heslo" required>
+        <button class="primary" type="submit" id="login-submit">Přihlásit</button>
+      </form>
+      <div id="login-error" class="small f-danger" role="alert" hidden></div>
+    </section>
+
+    <section id="scanner" class="scanner">
+      <div class="viewport" id="viewport">
+        <video id="video" playsinline muted></video>
+        <div class="frame" aria-hidden="true"></div>
+        <div class="placeholder" id="placeholder">
+          <p>Namiř fotoaparát na QR kód.</p>
+          <p class="muted small">Odkaz se sám neotevře — nejdřív uvidíš výsledek kontroly.</p>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="btn-scan" class="primary">Spustit skener</button>
+        <button id="btn-torch" class="secondary" hidden>Svítilna</button>
+        <label class="secondary file-btn">Z obrázku<input id="file" type="file" accept="image/*" hidden></label>
+        <button id="btn-manual" class="secondary">Vložit text</button>
+      </div>
+      <form id="manual" class="manual" hidden>
+        <textarea id="manual-text" rows="3" placeholder="Vlož odkaz nebo obsah QR kódu…" autocomplete="off" spellcheck="false"></textarea>
+        <button class="primary" type="submit">Zkontrolovat</button>
+      </form>
+    </section>
+
+    <section id="result" class="result" hidden aria-live="polite"></section>
+  </main>
+
+  <dialog id="settings">
+    <form method="dialog" class="settings">
+      <h2>Nastavení</h2>
+      <fieldset>
+        <legend>Online kontroly</legend>
+        <label class="check"><input type="checkbox" id="set-sb"> Google Safe Browsing <small class="muted">odejdou jen 4bajtové prefixy hashů</small></label>
+        <label class="check"><input type="checkbox" id="set-vt"> VirusTotal <small class="muted">odejde jen SHA‑256 hash URL a hlavní doména</small></label>
+        <label class="check"><input type="checkbox" id="set-rdap"> Stáří domény (RDAP) <small class="muted">odejde jen hlavní doména</small></label>
+        <label class="check"><input type="checkbox" id="set-unroll"> Automaticky rozbalit zkracovače <small class="muted">server navštíví jen zkracovač (bit.ly apod.), ne cílový web</small></label>
+      </fieldset>
+      <p class="muted small">Celá adresa nikdy neodchází do VirusTotalu ani Googlu. Nic se neukládá do historie.</p>
+      <div class="row">
+        <button type="button" id="btn-logout" class="secondary danger-text" hidden>Odhlásit</button>
+        <span class="spacer"></span>
+        <button value="cancel" class="secondary">Zrušit</button>
+        <button value="save" id="set-save" class="primary">Uložit</button>
+      </div>
+    </form>
+  </dialog>
+
+  <canvas id="canvas" hidden></canvas>
+</body>
+</html>

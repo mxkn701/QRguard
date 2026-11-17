@@ -1,0 +1,16 @@
+# závislosti a build
+node_modules/
+.wrangler/
+
+# tajné hodnoty — NIKDY necommitovat
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.env
+.env.*
+*.pem
+*.key
+
+# lokální nastavení nástrojů
+.claude/settings.local.json
+.DS_Store

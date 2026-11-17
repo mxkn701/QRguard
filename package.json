@@ -1,0 +1,41 @@
+{
+  "name": "qrguard",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "dev": "wrangler dev",
+    "dev:phone": "wrangler dev --ip 0.0.0.0 --local-protocol https",
+    "deploy": "wrangler deploy",
+    "test": "node --test test/",
+    "vendor": "cp node_modules/jsqr/dist/jsQR.js public/vendor/jsQR.js"
+  },
+  "devDependencies": {
+    "@cloudflare/puppeteer": "1.4.0",
+    "jsqr": "1.4.0",
+    "qrcode-terminal": "0.12.0",
+    "wrangler": "4.162.0"
+  },
+  "description": "Skener QR kódů, který před otevřením zkontroluje, jestli odkaz není škodlivý. Soukromí na prvním místě.",
+  "cloudflare": {
+    "label": "QRguard",
+    "products": [
+      "Workers",
+      "Browser Rendering"
+    ],
+    "categories": [
+      "security"
+    ],
+    "bindings": {
+      "APP_PASSWORD": {
+        "description": "Heslo do appky (aspoň 12 znaků). Chrání tvůj server, aby tvoje API kvóty nemohl používat kdokoliv. Ulož si ho, budeš ho zadávat v telefonu."
+      },
+      "VT_API_KEY": {
+        "description": "Volitelné. Klíč k VirusTotalu: zaregistruj se na [virustotal.com](https://www.virustotal.com/gui/join-us), pak profil → API key. Zdarma 500 dotazů denně."
+      },
+      "SB_API_KEY": {
+        "description": "Volitelné. Klíč ke Google Safe Browsing: v [Google Cloud Console](https://console.cloud.google.com/apis/library/safebrowsing.googleapis.com) povol Safe Browsing API, pak Credentials → Create credentials → API key."
+      }
+    }
+  }
+}
