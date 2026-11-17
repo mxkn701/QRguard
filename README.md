@@ -32,7 +32,10 @@ u Cloudflare (Browser Rendering), ne v telefonu. Případný exploit tak proběh
 - **žádosti o oprávnění**: notifikace, poloha, kamera, mikrofon (náhled je naoko odmítne),
 - **zápis do schránky** (podvržené příkazy typu „ClickFix“ nebo čísla účtů),
 - **přihlašovací a platební formuláře**: heslo nebo karta na doméně, která nepatří značce, za kterou se stránka vydává; formuláře odesílané na cizí doménu; žádosti o SMS kód,
-- **přesměrování**, včetně těch v JavaScriptu, a pokusy o přístup do lokální sítě.
+- **přesměrování**, včetně těch v JavaScriptu, a pokusy o přístup do lokální sítě (zablokují se).
+
+Stránka nemůže smazat ani podvrhnout záznamy o tom, co dělala: odcházejí ven skrytým kanálem, ke kterému
+nemá přístup. Formuláře se kontrolují z oddělené části prohlížeče, kterou stránka nemůže ovlivnit.
 
 Free plán: 10 minut prohlížeče denně a jeden nový náhled za 20 s. Jeden náhled trvá 5–10 s.
 Náhled cílový web skutečně navštíví, proto se spouští jen na kliknutí (jednorázové odkazy by se spotřebovaly).
@@ -55,8 +58,12 @@ API klíče jsou volitelné a dají se doplnit později. Bez nich fungují offli
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/mxkn701/QRguard)
 
 Cloudflare si vyžádá přihlášení, zkopíruje repozitář do tvého GitHubu a zeptá se na **heslo** a **klíče**
-(u každého pole je návod, kde ho získat). Formulář vyžaduje vyplnit všechna pole: když klíč nemáš, napiš `-`.
-Pak appku sám nasadí a ukáže adresu.
+(u každého pole je návod, kde ho získat). Pak appku sám nasadí a ukáže adresu.
+
+- **Heslo** musí mít aspoň 12 znaků.
+- Formulář vyžaduje vyplnit všechna pole: **když klíč nemáš, napiš `-`**.
+- Upozornění, že Browser Rendering je jen v placeném plánu, můžeš ignorovat. Bezpečný náhled funguje i zdarma
+  (s denním limitem, viz výše).
 
 ### Možnost B: průvodce v terminálu
 
@@ -77,6 +84,14 @@ jdou rovnou do šifrovaných secrets u Cloudflare. Změna hesla nebo klíčů po
 ### Pak v telefonu
 
 Otevři adresu `https://qrguard.<účet>.workers.dev` → zadej heslo → v menu prohlížeče **Přidat na plochu**.
+
+### Aktualizace
+
+- **Průvodce nebo ruční instalace:** `git pull` a pak `npm run deploy`.
+- **Tlačítko Deploy to Cloudflare:** tlačítko vytvořilo samostatnou kopii repozitáře na tvém GitHubu. Nové verze do ní
+  přenes (např. stažením změn z `mxkn701/QRguard`) a Cloudflare ji po každém pushi nasadí sám.
+
+Některé aktualizace změní formát přihlášení. Pak se na zařízeních jednou přihlásíš znovu.
 
 ### Kde získat klíče
 
@@ -101,7 +116,7 @@ npx wrangler secret put APP_PASSWORD
 
 ### Přihlášení
 
-- Heslo se zadává jednou na zařízení. Server pak uloží podepsanou cookie platnou **90 dní**
+- Heslo (aspoň 12 znaků) se zadává jednou na zařízení. Server pak uloží podepsanou cookie platnou **90 dní**
   (`HttpOnly`, `Secure`, `SameSite=Strict` — JavaScript ani cizí weby k ní nemají přístup).
 - **Odhlášení jednoho zařízení:** ⚙️ → Odhlásit.
 - **Odhlášení všech zařízení:** změň heslo (`npm run setup` nebo `npx wrangler secret put APP_PASSWORD`).
@@ -111,7 +126,21 @@ npx wrangler secret put APP_PASSWORD
   Durable Object (`src/guard.js`). Při útoku se na chvíli zablokuje jen nové přihlášení, přihlášená zařízení fungují dál.
 - Volitelně `APP_TOKEN` (aspoň 32 znaků): token pro skripty a testy (hlavička `Authorization: Bearer …`). Appka ho nepotřebuje.
 
-### Vlastní doména (později)
+## Zabezpečení
+
+QRguard zpracovává obsah od cizích lidí (QR kód), proto počítá s tím, že se ho někdo pokusí zneužít:
+
+| Útok | Ochrana |
+|---|---|
+| **Hádání hesla** | pokusy přesně počítá Durable Object: 5 za 15 minut z jedné sítě (u IPv6 celá síť /64), 50 za hodinu celkem; heslo aspoň 12 znaků |
+| **Krádež přihlášení** | cookie `HttpOnly`, `Secure`, `SameSite=Strict`; podpis náhodným klíčem, takže z cookie nejde zjistit heslo |
+| **XSS** (podvržený skript v QR kódu) | obsah se vkládá jen jako text, nikdy jako HTML; přísná CSP zakáže cizí skripty |
+| **Nebezpečné odkazy** | `javascript:`, `data:`, `intent:` apod. appka neotevře; odkaz s varováním otevře až po potvrzení |
+| **Cizí weby volající API** | server přijímá jen požadavky z vlastní adresy; jen `POST`, max. 16 kB |
+| **SSRF** (zneužití serveru k návštěvě vnitřních adres) | rozbalování odkazů i náhled blokují soukromé a rezervované adresy, i když se schovávají za doménou (ověřuje se přes DNS) |
+| **Únik toho, co skenuješ** | ven jdou jen hashe, prefixy hashů nebo hlavní doména; server nic neloguje a chyby nevrací podrobnosti |
+
+## Vlastní doména (později)
 
 Až bude `qrguard.dev` (nebo jiná doména) v tvém Cloudflare účtu, přidej do `wrangler.jsonc`:
 
@@ -130,6 +159,7 @@ npm install
 ```bash
 cp .dev.vars.example .dev.vars
 ```
+V `.dev.vars` vyplň `APP_PASSWORD` (aspoň 12 znaků), klíče jsou volitelné. Pak:
 ```bash
 npm run dev
 ```
@@ -158,6 +188,9 @@ Kamera v prohlížeči funguje jen přes HTTPS nebo `localhost`. Pro test z tele
 
 ## Omezení
 
+- Chytrá podvodná stránka může v náhledu vypadat neškodně, když pozná, že ji otevírá automat, a útok
+  ukáže až skutečnému telefonu. Náhled je proto další vrstva, ne záruka.
+- Bezpečný náhled má na free plánu limit 10 minut prohlížeče denně (zhruba 60–100 náhledů).
 - „Bez varovných signálů“ není záruka. Nový phishing nemusí být ještě v žádné databázi, proto appka hlídá i stáří domény a vzhled adresy.
 - VirusTotal hash adresy najde jen URL, které už někdo dřív nahlásil. U osobních odkazů je „neznámá“ normální a bezpečnostně správné.
 - Detekce napodobenin značek pokrývá jen značky v `lists.js` (hlavně české banky, dopravce a velké služby).
