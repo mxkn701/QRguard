@@ -19,13 +19,6 @@
   "description": "Skener QR kódů, který před otevřením zkontroluje, jestli odkaz není škodlivý. Soukromí na prvním místě.",
   "cloudflare": {
     "label": "QRguard",
-    "products": [
-      "Workers",
-      "Browser Rendering"
-    ],
-    "categories": [
-      "security"
-    ],
     "bindings": {
       "APP_PASSWORD": {
         "description": "Heslo do appky (aspoň 12 znaků). Chrání tvůj server, aby tvoje API kvóty nemohl používat kdokoliv. Ulož si ho, budeš ho zadávat v telefonu."
