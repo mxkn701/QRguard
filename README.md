@@ -140,6 +140,9 @@ QRguard zpracovává obsah od cizích lidí (QR kód), proto počítá s tím, �
 | **SSRF** (zneužití serveru k návštěvě vnitřních adres) | rozbalování odkazů i náhled blokují soukromé a rezervované adresy, i když se schovávají za doménou (ověřuje se přes DNS) |
 | **Únik toho, co skenuješ** | ven jdou jen hashe, prefixy hashů nebo hlavní doména; server nic neloguje a chyby nevrací podrobnosti |
 
+**Našel jsi bezpečnostní chybu?** Nahlas ji prosím soukromě přes [GitHub](https://github.com/mxkn701/QRguard/security/advisories/new),
+ne jako veřejné issue, aby ji nikdo nemohl zneužít dřív, než bude opravená.
+
 ## Vlastní doména (později)
 
 Až bude `qrguard.dev` (nebo jiná doména) v tvém Cloudflare účtu, přidej do `wrangler.jsonc`:
