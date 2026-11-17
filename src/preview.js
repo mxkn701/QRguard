@@ -28,10 +28,16 @@ const RISKY_MIME = {
 
 // Skript vložený do stránky ještě před jejím načtením — zaznamená, o co se stránka pokouší.
 // Žádosti o oprávnění „naoko“ odmítne, takže stránka nic nezíská.
-const PROBE = `(() => {
-  const ev = [];
-  Object.defineProperty(window, '__qrhEvents', { value: ev, enumerable: false });
-  const log = (type, detail) => { try { if (ev.length < 50) ev.push({ type, detail: String(detail || '').slice(0, 200) }); } catch {} };
+//
+// Události se neukládají do stránky (tam by je stránka mohla smazat), ale hned se posílají
+// ven přes CDP binding. Skript si binding schová do proměnné a z window ho smaže dřív,
+// než se spustí jakýkoliv skript stránky, takže stránka nemůže nic podvrhnout ani zamést.
+const probe = (binding) => `(() => {
+  const send = window[${JSON.stringify(binding)}];
+  try { delete window[${JSON.stringify(binding)}]; } catch {}
+  if (typeof send !== 'function') return;
+  let n = 0;
+  const log = (type, detail) => { try { if (n++ < 50) send(JSON.stringify({ type, detail: String(detail || '').slice(0, 200) })); } catch {} };
   const deny = () => Promise.reject(new DOMException('denied', 'NotAllowedError'));
   try { if (window.Notification) { Notification.requestPermission = () => { log('notifications'); return Promise.resolve('denied'); }; } } catch {}
   try { if (window.PushManager) PushManager.prototype.subscribe = function () { log('push'); return deny(); }; } catch {}
@@ -69,20 +75,36 @@ export async function preview(env, targetUrl, isPrivateHost) {
     const page = await browser.newPage();
     await page.setViewport({ width: 390, height: 780, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
     await page.setUserAgent(MOBILE_UA);
-    await page.evaluateOnNewDocument(PROBE);
+
+    // Kanál pro události ze stránky (viz probe) — jméno je náhodné pro každý náhled.
+    const events = [];
+    const binding = '__qrg_' + crypto.getRandomValues(new Uint32Array(2)).join('');
+    const cdp = await page.target().createCDPSession();
+    await cdp.send('Runtime.enable'); // bez toho CDP nedoručuje události bindingCalled
+    await cdp.send('Runtime.addBinding', { name: binding });
+    cdp.on('Runtime.bindingCalled', (e) => {
+      if (e.name !== binding || events.length >= 50) return;
+      try {
+        const d = JSON.parse(e.payload);
+        events.push({ type: String(d.type).slice(0, 40), detail: String(d.detail || '').slice(0, 200) });
+      } catch { /* ignore */ }
+    });
+    await page.evaluateOnNewDocument(probe(binding));
 
     // Zabránit přístupu do vnitřních sítí a zbytečným velkým přenosům.
     await page.setRequestInterception(true);
-    page.on('request', (req) => {
+    page.on('request', async (req) => {
       try {
+        if (['media', 'font'].includes(req.resourceType())) return req.abort('blockedbyclient');
         const u = new URL(req.url());
-        if ((u.protocol === 'http:' || u.protocol === 'https:') && isPrivateHost(u.hostname)) {
+        // Kontrola i přes DNS: „interni.example.com → 10.0.0.5“ se taky zablokuje.
+        if ((u.protocol === 'http:' || u.protocol === 'https:') && (await isPrivateHost(u.hostname))) {
           blocked.push(u.hostname);
           return req.abort('blockedbyclient');
         }
-        if (['media', 'font'].includes(req.resourceType())) return req.abort('blockedbyclient');
-      } catch { /* data:, blob: atd. */ }
-      return req.continue();
+        return req.continue();
+      } catch { /* data:, blob:, nebo už vyřízený požadavek */ }
+      try { await req.continue(); } catch { /* ignore */ }
     });
 
     page.on('response', (res) => {
@@ -114,26 +136,16 @@ export async function preview(env, targetUrl, isPrivateHost) {
     // Chvíli počkat na opožděné přesměrování / žádosti o oprávnění.
     await new Promise((r) => setTimeout(r, 2500));
 
+    // Prohlídka stránky v izolovaném světě: sdílí DOM, ale ne JavaScript stránky,
+    // takže stránka nemůže podvrhnout querySelectorAll, getBoundingClientRect apod.
     let info = {};
     try {
-      info = await page.evaluate(() => {
-        const q = (s) => [...document.querySelectorAll(s)];
-        const visible = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
-        const fieldText = (el) => [el.name, el.id, el.placeholder, el.autocomplete, el.getAttribute('aria-label')].join(' ').toLowerCase();
-        const inputs = q('input').filter(visible);
-        const formHosts = q('form[action]').map((f) => { try { return new URL(f.action, location.href).hostname; } catch { return null; } }).filter(Boolean);
-        return {
-          title: document.title.slice(0, 200),
-          passwordFields: inputs.filter((i) => i.type === 'password').length,
-          cardFields: inputs.filter((i) => /cc-|card|karty|karta|cvv|cvc|expir|platnost/.test(fieldText(i))).length,
-          otpFields: inputs.filter((i) => /otp|one-time|sms|kod|code|pin/.test(fieldText(i)) && i.type !== 'password').length,
-          loginLike: inputs.some((i) => /email|login|user|jmeno|username|phone|telefon/.test(fieldText(i) + ' ' + i.type)),
-          formHosts: [...new Set(formHosts)].slice(0, 5),
-          iframes: q('iframe').length,
-          events: (window.__qrhEvents || []).slice(0, 30),
-          textSample: (document.body?.innerText || '').replace(/\s+/g, ' ').slice(0, 400),
-        };
+      const { frameTree } = await cdp.send('Page.getFrameTree');
+      const { executionContextId } = await cdp.send('Page.createIsolatedWorld', { frameId: frameTree.frame.id, worldName: 'qrguard-inspect' });
+      const r = await cdp.send('Runtime.evaluate', {
+        expression: `(${INSPECT})()`, contextId: executionContextId, returnByValue: true, timeout: 3000,
       });
+      info = sanitizeInfo(r.result?.value);
     } catch { /* stránka mohla mezitím odejít */ }
 
     let screenshot = null;
@@ -151,10 +163,48 @@ export async function preview(env, targetUrl, isPrivateHost) {
       loadError: downloads.length && loadError && /ERR_ABORTED/.test(loadError) ? null : loadError,
       screenshot,
       ...info,
+      events: events.slice(0, 30),
     };
   } finally {
     try { await browser.close(); } catch { /* ignore */ }
   }
+}
+
+// Běží v izolovaném světě stránky. Je to text (ne funkce), aby do něj bundler nevložil
+// pomocné volání (např. __name), které v prohlížeči neexistuje.
+const INSPECT = String.raw`function () {
+  const q = (s) => [...document.querySelectorAll(s)];
+  const visible = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+  const fieldText = (el) => [el.name, el.id, el.placeholder, el.autocomplete, el.getAttribute('aria-label')].join(' ').toLowerCase();
+  const inputs = q('input').filter(visible);
+  const formHosts = q('form[action]').map((f) => { try { return new URL(f.getAttribute('action') || '', location.href).hostname; } catch { return null; } }).filter(Boolean);
+  return {
+    title: String(document.title).slice(0, 200),
+    passwordFields: inputs.filter((i) => i.type === 'password').length,
+    cardFields: inputs.filter((i) => /cc-|card|karty|karta|cvv|cvc|expir|platnost/.test(fieldText(i))).length,
+    otpFields: inputs.filter((i) => /otp|one-time|sms|kod|code|pin/.test(fieldText(i)) && i.type !== 'password').length,
+    loginLike: inputs.some((i) => /email|login|user|jmeno|username|phone|telefon/.test(fieldText(i) + ' ' + i.type)),
+    formHosts: [...new Set(formHosts)].slice(0, 5),
+    iframes: q('iframe').length,
+    textSample: (document.body ? document.body.innerText : '').replace(/\s+/g, ' ').slice(0, 400),
+  };
+}`;
+
+// Výsledek z prohlížeče je pořád „cizí“ — ověřit typy, než ho pošleme do appky.
+function sanitizeInfo(v) {
+  if (!v || typeof v !== 'object') return {};
+  const num = (x) => (Number.isFinite(x) ? Math.max(0, Math.min(999, Math.floor(x))) : 0);
+  const str = (x, n) => (typeof x === 'string' ? x.slice(0, n) : '');
+  return {
+    title: str(v.title, 200),
+    passwordFields: num(v.passwordFields),
+    cardFields: num(v.cardFields),
+    otpFields: num(v.otpFields),
+    loginLike: v.loginLike === true,
+    formHosts: Array.isArray(v.formHosts) ? v.formHosts.filter((h) => typeof h === 'string').map((h) => h.slice(0, 253)).slice(0, 5) : [],
+    iframes: num(v.iframes),
+    textSample: str(v.textSample, 400),
+  };
 }
 
 function decodeSafe(s) {

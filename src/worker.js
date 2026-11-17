@@ -13,6 +13,11 @@
 import { SHORTENERS } from '../public/lists.js';
 import { preview } from './preview.js';
 import { isAuthorized, login, logout } from './auth.js';
+import { resolvesPrivate, readBodyLimited } from './net.js';
+
+export { LoginGuard } from './guard.js';
+
+const MAX_BODY = 16 * 1024; // všechny API požadavky jsou malé JSONy
 
 // Volitelné klíče: prázdná hodnota nebo zástupný znak (např. „-“ z formuláře Deploy to Cloudflare) = klíč není nastaven.
 const apiKey = (v) => (typeof v === 'string' && v.trim().length >= 16 ? v.trim() : '');
@@ -42,7 +47,8 @@ export default {
       try {
         res = await handleApi(request, env, url.pathname);
       } catch (e) {
-        res = json({ error: 'internal', message: String(e?.message || e).slice(0, 200) }, 500);
+        // Bez podrobností: text chyby může prozradit vnitřní detaily.
+        res = json({ error: 'internal', message: 'Chyba serveru. Zkus to znovu.' }, 500);
       }
       return withHeaders(res, { 'Cache-Control': 'no-store' });
     }
@@ -66,8 +72,11 @@ async function handleApi(request, env, path) {
   const origin = request.headers.get('Origin');
   if (origin && origin !== new URL(request.url).origin) return json({ error: 'origin' }, 403);
 
+  const text = await readBodyLimited(request, MAX_BODY);
+  if (text === null) return json({ error: 'too_large' }, 413);
   let body = {};
-  try { body = await request.json(); } catch { /* prázdné tělo */ }
+  try { body = text ? JSON.parse(text) : {}; } catch { /* nevalidní JSON = prázdné tělo */ }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) body = {};
 
   if (path === '/api/login') return login(request, env, body, json);
   if (path === '/api/logout') return logout(json);
@@ -285,27 +294,13 @@ async function rdap({ domain }) {
 async function previewApi(env, { url }) {
   let u;
   try { u = new URL(String(url)); } catch { return json({ error: 'bad_request' }, 400); }
-  if (!['http:', 'https:'].includes(u.protocol) || isPrivateHost(u.hostname)) return json({ error: 'bad_request' }, 400);
-  const r = await preview(env, u.href, isPrivateHost);
+  if (!['http:', 'https:'].includes(u.protocol) || (await resolvesPrivate(u.hostname))) return json({ error: 'bad_request' }, 400);
+  const r = await preview(env, u.href, resolvesPrivate);
   if (r.error) return json(r, r.error === 'rate_limited' ? 429 : 502);
   return json(r);
 }
 
 // ---------------- Rozbalení přesměrování ----------------
-
-function isPrivateHost(host) {
-  host = host.replace(/^\[|\]$/g, '').toLowerCase();
-  if (!host.includes('.') && !host.includes(':')) return true;
-  if (/(^|\.)(localhost|local|internal|lan|home|arpa|test|invalid)$/.test(host)) return true;
-  const m = host.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
-  if (m) {
-    const [a, b] = [Number(m[1]), Number(m[2])];
-    return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) ||
-      (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224;
-  }
-  if (host.includes(':')) return host === '::1' || /^(fc|fd|fe80)/.test(host) || host.startsWith('::ffff:');
-  return false;
-}
 
 // Vstup: { url, mode: 'shorteners' | 'all' }
 //  - 'shorteners': navštíví jen hopy na známých zkracovačích. Na cílový web se nepřipojí,
@@ -320,7 +315,7 @@ async function unroll({ url, mode }) {
 
   for (let hop = 0; hop < 10; hop++) {
     if (!['http:', 'https:'].includes(current.protocol)) { stopped = 'scheme'; break; }
-    if (isPrivateHost(current.hostname)) { stopped = 'private'; break; }
+    if (await resolvesPrivate(current.hostname)) { stopped = 'private'; break; }
     if (mode === 'shorteners' && !SHORTENERS.has(current.hostname.toLowerCase())) { stopped = 'not_shortener'; break; }
 
     let r;

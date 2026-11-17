@@ -97,16 +97,19 @@ npx wrangler deploy
 ```bash
 npx wrangler secret put APP_PASSWORD
 ```
-(a stejně `VT_API_KEY`, `SB_API_KEY`). Heslo musí mít aspoň 8 znaků, doporučeno 12+.
+(a stejně `VT_API_KEY`, `SB_API_KEY`). Heslo musí mít aspoň 12 znaků (kratší server odmítne).
 
 ### Přihlášení
 
 - Heslo se zadává jednou na zařízení. Server pak uloží podepsanou cookie platnou **90 dní**
   (`HttpOnly`, `Secure`, `SameSite=Strict` — JavaScript ani cizí weby k ní nemají přístup).
 - **Odhlášení jednoho zařízení:** ⚙️ → Odhlásit.
-- **Odhlášení všech zařízení:** změň heslo (`npx wrangler secret put APP_PASSWORD`). Všechny cookie jsou
-  podepsané klíčem odvozeným z hesla, takže okamžitě přestanou platit.
-- Volitelně `APP_TOKEN`: token pro skripty a testy (hlavička `Authorization: Bearer …`). Appka ho nepotřebuje.
+- **Odhlášení všech zařízení:** změň heslo (`npm run setup` nebo `npx wrangler secret put APP_PASSWORD`).
+  Cookie jsou podepsané náhodným klíčem, který se při změně hesla vymění, takže okamžitě přestanou platit.
+  Klíč s heslem nijak nesouvisí, takže ani z ukradené cookie nejde heslo zjistit.
+- **Omezení pokusů:** nejvýš 5 pokusů za 15 minut z jedné sítě a 50 za hodinu celkem. Počítá je přesně
+  Durable Object (`src/guard.js`). Při útoku se na chvíli zablokuje jen nové přihlášení, přihlášená zařízení fungují dál.
+- Volitelně `APP_TOKEN` (aspoň 32 znaků): token pro skripty a testy (hlavička `Authorization: Bearer …`). Appka ho nepotřebuje.
 
 ### Vlastní doména (později)
 
@@ -146,9 +149,11 @@ Kamera v prohlížeči funguje jen přes HTTPS nebo `localhost`. Pro test z tele
 - `src/worker.js`: API proxy s klíči, RDAP, rozbalování přesměrování
 - `src/preview.js`: bezpečný náhled v izolovaném prohlížeči
 - `src/auth.js`: přihlášení heslem a session cookie
+- `src/guard.js`: Durable Object s počítadlem pokusů o přihlášení a podpisovým klíčem cookie
+- `src/net.js`: rozpoznání soukromých adres (i přes DNS) a limit velikosti požadavků
 - `scripts/setup.mjs`, `install.sh`: průvodce instalací
 - `wrangler.jsonc`: konfigurace Workeru. `browser` = izolovaný Chrome pro bezpečný náhled,
-  `ratelimits` = omezení pokusů o přihlášení, `run_worker_first` = bezpečnostní hlavičky (CSP…) u všech souborů,
+  `durable_objects` = počítadlo pokusů o přihlášení, `run_worker_first` = bezpečnostní hlavičky (CSP…) u všech souborů,
   `observability` vypnutá = žádné logy toho, co se skenovalo
 
 ## Omezení
