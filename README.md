@@ -146,6 +146,9 @@ Kamera v prohlížeči funguje jen přes HTTPS nebo `localhost`. Pro test z tele
 - `src/preview.js`: bezpečný náhled v izolovaném prohlížeči
 - `src/auth.js`: přihlášení heslem a session cookie
 - `scripts/setup.mjs`, `install.sh`: průvodce instalací
+- `wrangler.jsonc`: konfigurace Workeru. `browser` = izolovaný Chrome pro bezpečný náhled,
+  `ratelimits` = omezení pokusů o přihlášení, `run_worker_first` = bezpečnostní hlavičky (CSP…) u všech souborů,
+  `observability` vypnutá = žádné logy toho, co se skenovalo
 
 ## Omezení
 
