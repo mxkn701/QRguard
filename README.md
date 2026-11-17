@@ -156,3 +156,8 @@ Kamera v prohlížeči funguje jen přes HTTPS nebo `localhost`. Pro test z tele
 - „Bez varovných signálů“ není záruka. Nový phishing nemusí být ještě v žádné databázi, proto appka hlídá i stáří domény a vzhled adresy.
 - VirusTotal hash adresy najde jen URL, které už někdo dřív nahlásil. U osobních odkazů je „neznámá“ normální a bezpečnostně správné.
 - Detekce napodobenin značek pokrývá jen značky v `lists.js` (hlavně české banky, dopravce a velké služby).
+
+## Licence
+
+[MIT](LICENSE). Přibalená knihovna [jsQR](https://github.com/cozmo/jsQR) (`public/vendor/jsQR.js`) je pod licencí
+Apache-2.0, viz [`public/vendor/jsQR.LICENSE.txt`](public/vendor/jsQR.LICENSE.txt).
